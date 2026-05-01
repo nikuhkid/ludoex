@@ -1,87 +1,92 @@
 import * as THREE from 'three'
 import { showLobby } from './ui/lobby'
+import { SceneManager } from './render/SceneManager'
+import { buildStandardBoard, buildOctagonalBoard, highlightTile } from './render/BoardRenderer'
+import { spawnPieces, tickPieceAnims } from './render/PieceRenderer'
 import type { Room } from './room/types'
 import './ui/lobby.css'
+import './ui/hud.css'
 
-// ── Renderer ──────────────────────────────────────────────
-const canvas = document.getElementById('game-canvas') as HTMLCanvasElement
+// ── Scene (always running, even behind lobby) ─────────────────
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
-renderer.setSize(window.innerWidth, window.innerHeight)
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-renderer.shadowMap.enabled = true
-renderer.shadowMap.type = THREE.PCFSoftShadowMap
-renderer.toneMapping = THREE.ACESFilmicToneMapping
-renderer.toneMappingExposure = 1.2
+const canvas  = document.getElementById('game-canvas') as HTMLCanvasElement
+const manager = new SceneManager(canvas)
+const clock   = new THREE.Clock()
 
-const scene = new THREE.Scene()
-scene.background = new THREE.Color(0x0a0a0f)
-scene.fog = new THREE.Fog(0x0a0a0f, 20, 60)
+// Raycaster for hover/click
+const raycaster = new THREE.Raycaster()
+const mouse     = new THREE.Vector2()
+let boardGroup: THREE.Group | null = null
 
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
-camera.position.set(0, 14, 0)
-camera.lookAt(0, 0, 0)
+function onMouseMove(e: MouseEvent) {
+  if (!boardGroup) return
+  mouse.x =  (e.clientX / window.innerWidth)  * 2 - 1
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1
+  raycaster.setFromCamera(mouse, manager.camera)
+  const hits = raycaster.intersectObject(boardGroup, true)
+  highlightTile(hits.length > 0 ? (hits[0].object as THREE.Mesh) : null)
+}
+canvas.addEventListener('mousemove', onMouseMove)
 
-// ── Placeholder scene (replaced in Phase 3) ───────────────
-const boardGeo = new THREE.PlaneGeometry(10, 10)
-const boardMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e })
-const board = new THREE.Mesh(boardGeo, boardMat)
-board.rotation.x = -Math.PI / 2
-board.receiveShadow = true
-scene.add(board)
+// ── Game start ────────────────────────────────────────────────
 
-const cubeGeo = new THREE.BoxGeometry(1, 1, 1)
-const cubeMat = new THREE.MeshStandardMaterial({ color: 0x7c6af7, metalness: 0.3, roughness: 0.4 })
-const cube = new THREE.Mesh(cubeGeo, cubeMat)
-cube.position.y = 0.5
-cube.castShadow = true
-scene.add(cube)
+function onGameStart(room: Room, _playerId: string): void {
+  document.getElementById('ui-overlay')!.innerHTML = buildHUD(room)
 
-// ── Lighting ──────────────────────────────────────────────
-const ambient = new THREE.AmbientLight(0xffffff, 0.3)
-scene.add(ambient)
+  const players = Object.values(room.players).map(p => p.color)
 
-const sun = new THREE.DirectionalLight(0xfff5e0, 1.5)
-sun.position.set(6, 12, 6)
-sun.castShadow = true
-sun.shadow.mapSize.set(2048, 2048)
-sun.shadow.camera.near = 0.1
-sun.shadow.camera.far = 50
-sun.shadow.camera.left = -15
-sun.shadow.camera.right = 15
-sun.shadow.camera.top = 15
-sun.shadow.camera.bottom = -15
-scene.add(sun)
+  // Clear any previous board
+  if (boardGroup) manager.scene.remove(boardGroup)
 
-const fill = new THREE.DirectionalLight(0xa0c4ff, 0.4)
-fill.position.set(-4, 6, -4)
-scene.add(fill)
+  boardGroup = room.boardType === 'standard'
+    ? buildStandardBoard(manager.scene, players, room.mode)
+    : buildOctagonalBoard(manager.scene, players, room.mode)
 
-// ── Resize ────────────────────────────────────────────────
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight
-  camera.updateProjectionMatrix()
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  spawnPieces(manager.scene, players, room.boardType)
+}
+
+function buildHUD(room: Room): string {
+  const players = Object.values(room.players)
+  return `
+    <div id="hud">
+      <div id="hud-info">
+        <span class="hud-code">${room.code}</span>
+        <span class="hud-mode mode-${room.mode}">${room.mode}</span>
+      </div>
+      <div id="hud-players">
+        ${players.map(p => `
+          <div class="hud-player">
+            <div class="hud-dot" style="background:${colorHex(p.color)}"></div>
+            <span>${escHtml(p.name)}</span>
+          </div>
+        `).join('')}
+      </div>
+      <div id="hud-hint">Game logic coming in Phase 4</div>
+    </div>
+  `
+}
+
+// ── Render loop ───────────────────────────────────────────────
+
+manager.start(() => {
+  const delta = clock.getDelta()
+  tickPieceAnims(delta)
 })
 
-// ── Render loop ───────────────────────────────────────────
-const clock = new THREE.Clock()
-
-function tick() {
-  const t = clock.getElapsedTime()
-  cube.rotation.x = t * 0.4
-  cube.rotation.y = t * 0.7
-  renderer.render(scene, camera)
-  requestAnimationFrame(tick)
-}
-
-tick()
-
-// ── App entry ─────────────────────────────────────────────
-function onGameStart(room: Room, playerId: string): void {
-  // Phase 3: board renders here
-  console.log('Game starting', room.code, playerId, room.boardType)
-}
+// ── Entry ────────────────────────────────────────────────────
 
 showLobby({ onGameStart })
+
+// ── Utils ────────────────────────────────────────────────────
+
+function escHtml(s: string): string {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+}
+
+function colorHex(c: string): string {
+  const map: Record<string,string> = {
+    red:'#e74c3c',blue:'#3498db',green:'#2ecc71',yellow:'#f1c40f',
+    purple:'#9b59b6',orange:'#e67e22',pink:'#e91e8c',cyan:'#1abc9c',
+  }
+  return map[c] ?? '#fff'
+}
