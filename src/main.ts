@@ -31,7 +31,9 @@ canvas.addEventListener('mousemove', onMouseMove)
 // ── Game start ────────────────────────────────────────────────
 
 function onGameStart(room: Room, _playerId: string): void {
-  document.getElementById('ui-overlay')!.innerHTML = buildHUD(room)
+  const overlay = document.getElementById('ui-overlay')!
+  overlay.style.pointerEvents = 'none'   // allow mouse events through to canvas
+  overlay.innerHTML = buildHUD(room)
 
   const players = Object.values(room.players).map(p => p.color)
 

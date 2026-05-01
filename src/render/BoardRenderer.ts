@@ -58,6 +58,34 @@ function makeTile(
   return mesh
 }
 
+// ── Exit triangle helper ──────────────────────────────────────
+
+function addExitTriangle(
+  group: THREE.Group,
+  color: PlayerColor,
+  cx: number, cz: number,   // home area center (X, Z)
+  dx: number, dz: number,   // unit direction toward cross
+): void {
+  const px = -dz, pz = dx   // perpendicular
+  const ax = cx + dx * 2.1, az = cz + dz * 2.1        // apex
+  const lx = cx - dx * 1.6 - px * 1.7, lz = cz - dz * 1.6 - pz * 1.7  // base-left
+  const rx = cx - dx * 1.6 + px * 1.7, rz = cz - dz * 1.6 + pz * 1.7  // base-right
+
+  const verts = new Float32Array([ax, 0.12, az, lx, 0.12, lz, rx, 0.12, rz])
+  const geo   = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(verts, 3))
+  geo.computeVertexNormals()
+
+  const triMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(COLOR_HEX[color]).multiplyScalar(0.72),
+    roughness: 0.45,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.82,
+  })
+  group.add(new THREE.Mesh(geo, triMat))
+}
+
 // ── Standard board ────────────────────────────────────────────
 
 export function buildStandardBoard(
@@ -129,6 +157,42 @@ export function buildStandardBoard(
         type: 'home-col', color, homeColIndex: i,
       }))
     })
+  }
+
+  // Cross interior — corner junctions (exit triangle connector at cross arms)
+  // These are the 4 tiles at inner corners of the cross, colored per nearby player
+  const crossCorners: [string, number, number][] = [
+    ['red', 6, 6], ['blue', 8, 6], ['green', 6, 8], ['yellow', 8, 8],
+  ]
+  for (const [color, c, r] of crossCorners) {
+    if (!usedColors.includes(color as PlayerColor)) continue
+    group.add(makeTile(TILE_GEO, M.homeArea(COLOR_HEX[color as PlayerColor]), c - HALF, r - HALF, {
+      type: 'junction', color,
+    }))
+  }
+
+  // Cross interior — home column connectors (bridge home cols to center)
+  const homeColConnectors: [string, number, number][] = [
+    ['red', 6, 7], ['blue', 7, 6], ['yellow', 8, 7], ['green', 7, 8],
+  ]
+  for (const [color, c, r] of homeColConnectors) {
+    if (!usedColors.includes(color as PlayerColor)) continue
+    group.add(makeTile(TILE_GEO, M.homeCol(COLOR_HEX[color as PlayerColor]), c - HALF, r - HALF, {
+      type: 'home-col', color, homeColIndex: 5,
+    }))
+  }
+
+  // Exit triangles inside each home area (pointing toward inner cross corner)
+  // Direction is diagonal inward: top-left→(+,+), top-right→(-,+), etc.
+  const exitArrows: [string, number, number, number, number][] = [
+    ['red',    -4.5, -4.5,  0.707,  0.707],
+    ['blue',    4.5, -4.5, -0.707,  0.707],
+    ['yellow',  4.5,  4.5, -0.707, -0.707],
+    ['green',  -4.5,  4.5,  0.707, -0.707],
+  ]
+  for (const [color, cx, cz, dx, dz] of exitArrows) {
+    if (!usedColors.includes(color as PlayerColor)) continue
+    addExitTriangle(group, color as PlayerColor, cx, cz, dx, dz)
   }
 
   // Center tile
