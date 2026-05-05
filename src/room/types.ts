@@ -8,6 +8,7 @@ export interface Player {
   color: PlayerColor
   isHost: boolean
   connected: boolean
+  autoBot?: boolean   // true when player is AFK/disconnected and being driven as bot
 }
 
 export type PlayerColor =
@@ -30,6 +31,24 @@ export const COLOR_HEX: Record<PlayerColor, string> = {
   cyan:   '#1abc9c',
 }
 
+export interface PieceState {
+  progress: number  // -1=base, 0..pathLen-1=path index, pathLen..pathLen+colLen-1=homeCol, pathLen+colLen=finished
+}
+
+export interface GameState {
+  turnOrder: string[]        // playerIds in turn order
+  currentTurn: number        // index into turnOrder
+  phase: 'setup' | 'roll' | 'move'
+  diceValue: number | null
+  consecutiveSixes: number
+  pieces: Record<string, PieceState[]>  // playerId -> 4 pieces
+  winner: string | null      // playerId or null
+  pendingCurse?: Record<string, string[]>   // playerId → curse queue ['skip'|'reverse'|'fumble']
+  shackled?: Record<string, number[]>      // playerId → [pieceIndices] restricted THIS turn
+  pendingShackle?: Record<string, number[]> // playerId → [pieceIndices] shackled this turn, active next
+  setupRolls?: Record<string, number>       // playerId → roll during initial order determination
+}
+
 export interface Room {
   code: string
   hostId: string
@@ -38,4 +57,5 @@ export interface Room {
   boardType: BoardType
   players: Record<string, Player>
   createdAt: number
+  gameState?: GameState
 }

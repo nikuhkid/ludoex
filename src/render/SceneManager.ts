@@ -12,6 +12,13 @@ export class SceneManager {
   private prevX = 0
   private animId = 0
 
+  // Smooth camera state
+  private camPos    = new THREE.Vector3()
+  private camGoal   = new THREE.Vector3()
+  private lookPos   = new THREE.Vector3()
+  private lookGoal  = new THREE.Vector3()
+  private lerping   = false
+
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     this.renderer.setSize(window.innerWidth, window.innerHeight)
@@ -65,12 +72,11 @@ export class SceneManager {
       if (!this.isDragging) return
       this.theta += (e.clientX - this.prevX) * 0.006
       this.prevX = e.clientX
-      this.updateCamera()
+      this.cancelFocus()
     })
     canvas.addEventListener('mouseup',    () => this.isDragging = false)
     canvas.addEventListener('mouseleave', () => this.isDragging = false)
 
-    // Touch support
     canvas.addEventListener('touchstart', e => {
       this.isDragging = true
       this.prevX = e.touches[0].clientX
@@ -79,24 +85,76 @@ export class SceneManager {
       if (!this.isDragging) return
       this.theta += (e.touches[0].clientX - this.prevX) * 0.006
       this.prevX = e.touches[0].clientX
-      this.updateCamera()
+      this.cancelFocus()
     }, { passive: true })
     canvas.addEventListener('touchend', () => this.isDragging = false)
 
-    // Scroll to zoom (clamp height)
     canvas.addEventListener('wheel', e => {
       this.height = Math.max(8, Math.min(28, this.height + e.deltaY * 0.02))
-      this.updateCamera()
+      this.cancelFocus()
     }, { passive: true })
   }
 
+  // Snap camera to current orbit position (called on manual user input)
   updateCamera(): void {
-    this.camera.position.set(
+    const x = this.radius * Math.sin(this.theta)
+    const z = this.radius * Math.cos(this.theta)
+    this.camPos.set(x, this.height, z)
+    this.camGoal.copy(this.camPos)
+    this.lookPos.set(0, 0, 0)
+    this.lookGoal.set(0, 0, 0)
+    this.camera.position.copy(this.camPos)
+    this.camera.lookAt(this.lookPos)
+  }
+
+  private cancelFocus(): void {
+    this.lerping = false
+    this.updateCamera()
+  }
+
+  // ── Focus API ─────────────────────────────────────────────────
+
+  focusOn(worldPos: THREE.Vector3): void {
+    // Direction from board center to piece (XZ plane)
+    const dx = worldPos.x
+    const dz = worldPos.z
+    const len = Math.sqrt(dx * dx + dz * dz)
+    const nx  = len > 0.5 ? dx / len : 0
+    const nz  = len > 0.5 ? dz / len : 1
+
+    // Camera: offset outward from piece and up
+    this.camGoal.set(
+      worldPos.x + nx * 5,
+      worldPos.y + 7,
+      worldPos.z + nz * 5,
+    )
+    this.lookGoal.set(worldPos.x, worldPos.y + 0.3, worldPos.z)
+    this.lerping = true
+  }
+
+  returnToOverview(): void {
+    this.camGoal.set(
       this.radius * Math.sin(this.theta),
       this.height,
       this.radius * Math.cos(this.theta),
     )
-    this.camera.lookAt(0, 0, 0)
+    this.lookGoal.set(0, 0, 0)
+    this.lerping = true
+  }
+
+  // ── Tick (call every frame) ───────────────────────────────────
+
+  tick(delta: number): void {
+    if (!this.lerping) return
+    const t = Math.min(5 * delta, 1)
+    this.camPos.lerp(this.camGoal, t)
+    this.lookPos.lerp(this.lookGoal, t)
+    this.camera.position.copy(this.camPos)
+    this.camera.lookAt(this.lookPos)
+    if (this.camPos.distanceTo(this.camGoal) < 0.04 &&
+        this.lookPos.distanceTo(this.lookGoal) < 0.04) {
+      this.lerping = false
+    }
   }
 
   start(onFrame: () => void): void {

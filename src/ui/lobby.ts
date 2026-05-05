@@ -126,7 +126,12 @@ function showJoinForm(callbacks: LobbyCallbacks): void {
       const { room, playerId } = await joinRoom(code, name)
       currentCode = room.code
       currentPlayerId = playerId
-      showWaitingRoom(room, playerId, callbacks)
+      if (room.status === 'playing') {
+        window.addEventListener('beforeunload', handleUnload)
+        callbacks.onGameStart(room, playerId)
+      } else {
+        showWaitingRoom(room, playerId, callbacks)
+      }
     } catch (e) {
       showError((e as Error).message)
       setLoading(false)
@@ -157,6 +162,7 @@ function renderWaitingRoom(room: Room, playerId: string, callbacks: LobbyCallbac
   const players = Object.values(room.players)
   const isHost = room.hostId === playerId
   const canStart = isHost && players.length >= 2
+  const canAddBot = isHost && players.length < 8
 
   document.getElementById('ui-overlay')!.innerHTML = `
     <div class="lobby-screen">
@@ -173,6 +179,7 @@ function renderWaitingRoom(room: Room, playerId: string, callbacks: LobbyCallbac
               <span class="player-name">${escapeHtml(p.name)}</span>
               ${p.isHost ? '<span class="host-badge">HOST</span>' : ''}
               ${p.id === playerId ? '<span class="you-badge">YOU</span>' : ''}
+              ${p.name.startsWith('Bot ') ? '<span class="bot-badge">BOT</span>' : ''}
             </div>
           `).join('')}
           ${Array.from({ length: 8 - players.length }, (_, i) => `
@@ -185,6 +192,7 @@ function renderWaitingRoom(room: Room, playerId: string, callbacks: LobbyCallbac
         <div id="form-error" class="form-error hidden"></div>
         <div class="form-actions">
           <button class="btn btn-ghost" id="btn-leave">Leave</button>
+          ${isHost && canAddBot ? `<button class="btn btn-ghost" id="btn-add-bot">+ Bot</button>` : ''}
           ${isHost ? `<button class="btn btn-primary" id="btn-start" ${canStart ? '' : 'disabled'}>
             ${canStart ? 'Start Game' : 'Need 2+ players'}
           </button>` : '<p class="waiting-for-host">Waiting for host to start...</p>'}
@@ -201,6 +209,15 @@ function renderWaitingRoom(room: Room, playerId: string, callbacks: LobbyCallbac
   })
 
   if (isHost) {
+    document.getElementById('btn-add-bot')?.addEventListener('click', async () => {
+      const botCount = players.filter(p => p.name.startsWith('Bot ')).length
+      try {
+        await joinRoom(room.code, `Bot ${botCount + 1}`)
+      } catch (e) {
+        showError((e as Error).message)
+      }
+    })
+
     document.getElementById('btn-start')?.addEventListener('click', async () => {
       try {
         await startGame(room.code, playerId)

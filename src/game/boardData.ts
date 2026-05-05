@@ -44,17 +44,27 @@ export const STANDARD_HOME_ENTRY: Record<string, number> = {
 export const STANDARD_SAFE_INDICES  = new Set([0, 4, 13, 17, 26, 30, 39, 43])
 export const STANDARD_STAR_INDICES  = new Set([7, 20, 33, 46])
 export const STANDARD_SKULL_INDICES = new Set([2, 15, 28, 41])
+export const STANDARD_BOOST_INDICES = new Set([9, 22, 35, 48])
+export const STANDARD_BOMB_INDICES  = new Set([5, 18, 31, 44])
+export const STANDARD_SWAP_INDICES  = new Set([11, 24, 37, 50])
 
-// ── Octagonal board (8 players, computed positions) ──────────
+// ── Curse tiles (remix mode) ──────────────────────────────────
+export const STANDARD_SKIP_INDICES    = new Set([6, 19, 32, 45])
+export const STANDARD_REVERSE_INDICES = new Set([8, 21, 34, 47])
+export const STANDARD_FUMBLE_INDICES  = new Set([10, 23, 36, 49])
+export const STANDARD_SHACKLE_INDICES = new Set([12, 25, 38, 51])
 
-const OCT_TILES_PER_SIDE = 7
+// ── Hexadecagonal board (8 players, 16-sided ring) ────────────
+
+const OCT_SIDES          = 16   // hexadecagon
+const OCT_TILES_PER_SIDE = 3    // 48 path tiles — 3/side keeps corner gap ≥ 0.812 so W=0.80 tiles never overlap
 const OCT_PATH_RADIUS    = 9
 
 export function genOctPath(): [number, number][] {
   const path: [number, number][] = []
-  for (let side = 0; side < 8; side++) {
-    const a0 = (side / 8) * Math.PI * 2 - Math.PI / 2
-    const a1 = ((side + 1) / 8) * Math.PI * 2 - Math.PI / 2
+  for (let side = 0; side < OCT_SIDES; side++) {
+    const a0 = (side / OCT_SIDES) * Math.PI * 2 - Math.PI / 2
+    const a1 = ((side + 1) / OCT_SIDES) * Math.PI * 2 - Math.PI / 2
     const x0 = OCT_PATH_RADIUS * Math.cos(a0)
     const z0 = OCT_PATH_RADIUS * Math.sin(a0)
     const x1 = OCT_PATH_RADIUS * Math.cos(a1)
@@ -67,6 +77,9 @@ export function genOctPath(): [number, number][] {
   return path
 }
 
+// sideIndex = player index 0-7; home col points from player's mid-vertex toward center.
+// Math: player k owns sides 2k and 2k+1 of the hexadecagon; mid-vertex at (2k+1)/16·2π
+// which equals (k+0.5)/8·2π — identical to the old 8-side formula, so geometry unchanged.
 export function genOctHomeCol(sideIndex: number, length = 5): [number, number][] {
   const midAngle = ((sideIndex + 0.5) / 8) * Math.PI * 2 - Math.PI / 2
   const mx = OCT_PATH_RADIUS * Math.cos(midAngle)
@@ -94,19 +107,29 @@ export function genOctBase(sideIndex: number): [number, number][] {
   ]
 }
 
+// Player k owns 2 sides (6 tiles each): tiles 6k … 6k+5
 export const OCT_PLAYER_START: Record<string, number> = {
-  red: 0, blue: 7, green: 14, yellow: 21,
-  purple: 28, orange: 35, pink: 42, cyan: 49,
+  red: 0, blue: 6, green: 12, yellow: 18,
+  purple: 24, orange: 30, pink: 36, cyan: 42,
 }
 
 export const OCT_HOME_ENTRY: Record<string, number> = {
-  red: 54, blue: 5, green: 12, yellow: 19,
-  purple: 26, orange: 33, pink: 40, cyan: 47,
+  red: 46, blue: 4, green: 10, yellow: 16,
+  purple: 22, orange: 28, pink: 34, cyan: 40,
 }
 
-export const OCT_SAFE_INDICES  = new Set([0,7,14,21,28,35,42,49,4,11,18,25,32,39,46,53])
-export const OCT_STAR_INDICES  = new Set([3,10,17,24,31,38,45,52])
-export const OCT_SKULL_INDICES = new Set([6,13,20,27,34,41,48,55])
+// Safe: start tile + mid tile per player section
+export const OCT_SAFE_INDICES  = new Set([0,6,12,18,24,30,36,42, 2,8,14,20,26,32,38,44])
+export const OCT_STAR_INDICES  = new Set([1,7,13,19,25,31,37,43])
+export const OCT_SKULL_INDICES = new Set([4,10,16,22,28,34,40,46])
+export const OCT_BOOST_INDICES = new Set([3, 9, 27, 33])
+export const OCT_BOMB_INDICES  = new Set([5, 11, 21, 47])
+export const OCT_SWAP_INDICES  = new Set([15, 23, 35, 41])
+
+export const OCT_SKIP_INDICES    = new Set([17])
+export const OCT_REVERSE_INDICES = new Set([29])
+export const OCT_FUMBLE_INDICES  = new Set([39])
+export const OCT_SHACKLE_INDICES = new Set([45])
 
 // ── Shared ────────────────────────────────────────────────────
 

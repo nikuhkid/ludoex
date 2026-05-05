@@ -290,7 +290,7 @@ h2 {
   font-style: italic;
 }
 
-.host-badge, .you-badge {
+.host-badge, .you-badge, .bot-badge {
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -308,6 +308,12 @@ h2 {
   background: rgba(124,106,247,0.15);
   color: #9180ff;
   border: 1px solid rgba(124,106,247,0.3);
+}
+
+.bot-badge {
+  background: rgba(100,200,100,0.12);
+  color: #6ec97a;
+  border: 1px solid rgba(100,200,100,0.25);
 }
 
 .waiting-for-host {
