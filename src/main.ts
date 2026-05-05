@@ -913,6 +913,7 @@ function onGameStart(room: Room, playerId: string): void {
   overlay.innerHTML = buildHUD(room)
   bindCamToggle()
   bindLegend()
+  bindAFKBack()
 
   const players = Object.values(room.players).map(p => p.color)
 
@@ -966,6 +967,7 @@ function buildHUD(room: Room): string {
         `).join('')}
       </div>
       <div id="hud-effects"></div>
+      <button id="hud-afk-back" class="hud-afk-back-btn" style="display:none">I'm back!</button>
       <div id="hud-turn-indicator"></div>
       <div id="hud-status"></div>
     </div>
@@ -1006,6 +1008,18 @@ function hideLegend(): void {
 
 function bindLegend(): void {
   document.getElementById('btn-legend')?.addEventListener('click', showLegend)
+}
+
+function bindAFKBack(): void {
+  document.getElementById('hud-afk-back')?.addEventListener('click', () => {
+    if (!currentRoom || !myPlayerId) return
+    playerIsAFK = false
+    hideAFKPopup()
+    setPlayerAutoBot(currentRoom.code, myPlayerId, false).catch(console.error)
+    if (dieRenderer && currentRoom.gameState?.turnOrder[currentRoom.gameState.currentTurn] === myPlayerId) {
+      dieRenderer.clickable = true
+    }
+  })
 }
 
 function bindCamToggle(): void {
@@ -1090,6 +1104,12 @@ function updateHUD(room: Room): void {
       if (shackleCount > 0) icons.push(`<span title="${shackleCount} piece${shackleCount > 1 ? 's' : ''} shackled this turn">&#x1F512;</span>`)
       curseEl.innerHTML = icons.join('')
     }
+  }
+
+  // ── AFK back button ──────────────────────────────────────────
+  const afkBackBtn = document.getElementById('hud-afk-back') as HTMLElement | null
+  if (afkBackBtn && myPlayerId) {
+    afkBackBtn.style.display = room.players[myPlayerId]?.autoBot ? '' : 'none'
   }
 
   // ── Effects panel for local player ───────────────────────────
